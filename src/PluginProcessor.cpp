@@ -98,17 +98,15 @@ void LopasGateProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         // Envelope → CV
         float cv = envelope.process();
 
-        // Vactrol model at control rate
+        // Vactrol runs at audio rate — coefficients are tuned for per-sample stepping
+        currentR = vactrol.process(1.0f - cv); // cv=1 → targetR=0 (open)
+
+        // setCutoff has exp/pow; only call when currentR ticks forward at control rate
         if (++ctrlRateCounter >= kCtrlInterval)
         {
             ctrlRateCounter = 0;
-            currentR = vactrol.process(1.0f - cv); // cv=1 → targetR=0 (open)
+            filter.setCutoff(currentR);
         }
-
-        // Update filter coefficient (cheap: only trig math, not per-sample critical path)
-        // Run unconditionally to track R; the exp/pow are relatively cheap at control rate
-        // but since currentR updates at control rate, this only changes kCtrlInterval times/block
-        filter.setCutoff(currentR);
 
         float in = channelData[i];
 
