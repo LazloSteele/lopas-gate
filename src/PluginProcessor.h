@@ -30,6 +30,8 @@ public:
     const juce::String getProgramName(int) override { return "Default"; }
     void changeProgramName(int, const juce::String&) override {}
 
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+
     void getStateInformation(juce::MemoryBlock& dest) override;
     void setStateInformation(const void* data, int size) override;
 
@@ -40,15 +42,17 @@ public:
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
+    static constexpr int kMaxChannels  = 2;
+    static constexpr int kCtrlInterval = 44; // ~1kHz at 44.1kHz
+
     EnvelopeGenerator envelope;
     VactrolModel      vactrol;
-    OnePoleFilter     filter;
+    OnePoleFilter     filter[kMaxChannels];
 
-    float currentR       = 1.0f;
-    float feedbackSample = 0.0f;
+    float currentR             = 1.0f;
+    float feedbackSample[kMaxChannels] = {};
 
     int ctrlRateCounter  = 0;
-    static constexpr int kCtrlInterval = 44; // ~1kHz at 44.1kHz
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LopasGateProcessor)
 };

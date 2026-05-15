@@ -3,10 +3,18 @@
 
 LopasGateProcessor::LopasGateProcessor()
     : AudioProcessor(BusesProperties()
-                         .withInput("Input",   juce::AudioChannelSet::mono(), true)
-                         .withOutput("Output", juce::AudioChannelSet::mono(), true)),
+                         .withInput("Input",   juce::AudioChannelSet::stereo(), true)
+                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
+}
+
+bool LopasGateProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    auto in  = layouts.getMainInputChannelSet();
+    auto out = layouts.getMainOutputChannelSet();
+    if (in != out) return false;
+    return in == juce::AudioChannelSet::mono() || in == juce::AudioChannelSet::stereo();
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout LopasGateProcessor::createParameterLayout()
@@ -39,21 +47,24 @@ juce::AudioProcessorValueTreeState::ParameterLayout LopasGateProcessor::createPa
 void LopasGateProcessor::prepareToPlay(double sampleRate, int)
 {
     envelope.setSampleRate(sampleRate);
-    filter.setSampleRate(sampleRate);
     vactrol.reset();
-    filter.reset();
     envelope.reset();
-    currentR       = 1.0f;
-    feedbackSample = 0.0f;
+    currentR        = 1.0f;
     ctrlRateCounter = 0;
 
-    // Apply current parameter values
+    for (int ch = 0; ch < kMaxChannels; ++ch)
+    {
+        filter[ch].setSampleRate(sampleRate);
+        filter[ch].reset();
+        filter[ch].setCutoff(1.0f);
+        feedbackSample[ch] = 0.0f;
+    }
+
     auto decayParam    = apvts.getRawParameterValue("decay");
     auto vacSpeedParam = apvts.getRawParameterValue("vacSpeed");
 
     envelope.setDecaySeconds(decayParam->load());
     vactrol.setSpeed(static_cast<VactrolModel::Speed>((int)vacSpeedParam->load()));
-    filter.setCutoff(1.0f); // start fully closed
 }
 
 void LopasGateProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiBuffer)
@@ -81,8 +92,12 @@ void LopasGateProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     auto midiIt  = midiBuffer.begin();
     auto midiEnd = midiBuffer.end();
 
-    auto* channelData = buffer.getWritePointer(0);
-    const int numSamples = buffer.getNumSamples();
+    const int numSamples  = buffer.getNumSamples();
+    const int numChannels = std::min(buffer.getNumChannels(), kMaxChannels);
+
+    float* channelPtrs[kMaxChannels];
+    for (int ch = 0; ch < numChannels; ++ch)
+        channelPtrs[ch] = buffer.getWritePointer(ch);
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -101,43 +116,40 @@ void LopasGateProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         // Vactrol runs at audio rate — coefficients are tuned for per-sample stepping
         currentR = vactrol.process(1.0f - cv); // cv=1 → targetR=0 (open)
 
-        // setCutoff has exp/pow; only call when currentR ticks forward at control rate
+        // setCutoff has exp/pow; only call at control rate
         if (++ctrlRateCounter >= kCtrlInterval)
         {
             ctrlRateCounter = 0;
-            filter.setCutoff(currentR);
+            for (int ch = 0; ch < numChannels; ++ch)
+                filter[ch].setCutoff(currentR);
         }
 
-        float in = channelData[i];
-
-        // Resonance: feedback path around filter input
-        // maxFeedback < 1 keeps stability; 0.9 allows noticeable resonance peak
+        // VCA gain is the same for all channels
         const float maxFeedback = 0.9f;
-        float filterIn = in + feedbackSample * res * maxFeedback;
+        const float gain = (mode == 1 || mode == 2)
+                               ? std::pow(1.0f - currentR, 1.5f)
+                               : 1.0f;
 
-        float out = filterIn;
-
-        if (mode == 0 || mode == 2) // LP or Combo
+        for (int ch = 0; ch < numChannels; ++ch)
         {
-            out = filter.process(filterIn);
-            feedbackSample = out;
-        }
-        else
-        {
-            // VCA mode: bypass filter but still process it to track state cleanly
-            filter.process(filterIn);
-            feedbackSample = 0.0f;
-            out = in;
-        }
+            float in      = channelPtrs[ch][i];
+            float filterIn = in + feedbackSample[ch] * res * maxFeedback;
+            float out      = filterIn;
 
-        // VCA gain: gamma=1.5 curve
-        if (mode == 1 || mode == 2) // VCA or Combo
-        {
-            float gain = std::pow(1.0f - currentR, 1.5f);
-            out *= gain;
-        }
+            if (mode == 0 || mode == 2) // LP or Combo
+            {
+                out = filter[ch].process(filterIn);
+                feedbackSample[ch] = out;
+            }
+            else // VCA only
+            {
+                filter[ch].process(filterIn);
+                feedbackSample[ch] = 0.0f;
+                out = in;
+            }
 
-        channelData[i] = out * level;
+            channelPtrs[ch][i] = out * gain * level;
+        }
     }
 }
 
