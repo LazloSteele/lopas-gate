@@ -23,8 +23,8 @@ The vactrol emulation is what makes it sound right. The LDR resistance doesn't t
 | Parameter | Range | Notes |
 |-----------|-------|-------|
 | Mode | LP / VCA / Combo | Three-way switch |
-| Strike | Button | Fires internal envelope (also triggered by MIDI note-on) |
-| Decay | 50ms – 3s | Envelope decay time |
+| Strike | Button | Hold to sustain gate open; release starts decay |
+| Decay | 50ms – 3s | Envelope decay time after gate closes |
 | Vac Speed | Slow / Med / Fast | Vactrol attack+decay coefficients |
 | Resonance | 0 – 100% | Feedback resonance; 0 = 292c character, higher = 292h |
 | Level | 0 – 100% | Output gain |
@@ -41,9 +41,9 @@ The vactrol emulation is what makes it sound right. The LDR resistance doesn't t
 ```
 [MIDI note-on / Strike button]
          ↓
-[Envelope Generator]   fast attack (1ms) / exponential decay
+[Envelope Generator]   1ms attack → sustain → exponential decay on release
          ↓
-[Vactrol Model]        asymmetric IIR — attack << decay
+[Vactrol Model]        asymmetric IIR at audio rate — attack << decay
          ↓ R_normalized
          ├──────────────────────┐
 [1-pole LP filter]          [VCA gain]
@@ -52,7 +52,22 @@ The vactrol emulation is what makes it sound right. The LDR resistance doesn't t
               [Audio Out]
 ```
 
-The vactrol runs at control rate (~1kHz); the filter and VCA run per-sample.
+Gate open: note-on or Strike held — envelope attacks and holds at peak.
+Gate close: note-off or Strike released — exponential decay begins.
+
+---
+
+## MIDI control
+
+The plugin accepts MIDI and responds to note-on/note-off with sample-accurate timing. MIDI is the intended way to drive the gate from a step sequencer.
+
+Because the plugin is an audio effect (not an instrument), DAWs don't route MIDI to it automatically. In **Ableton Live**:
+
+1. Place Lopas Gate on an audio track as an effect.
+2. Create a separate MIDI track for your step sequencer.
+3. On the MIDI track, set **MIDI To** → select the audio track → select **Lopas Gate** from the second dropdown.
+
+Note duration controls gate duration: a short step gives a short gate; a held note sustains the gate open until note-off.
 
 ---
 
