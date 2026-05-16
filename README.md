@@ -23,8 +23,9 @@ The vactrol emulation is what makes it sound right. The LDR resistance doesn't t
 | Parameter | Range | Notes |
 |-----------|-------|-------|
 | Mode | LP / VCA / Combo | Three-way switch |
-| Strike | Button | Fires internal envelope (also triggered by MIDI note-on) |
-| Decay | 50ms – 3s | Envelope decay time |
+| Strike | Button | Hold to sustain gate open; release starts decay |
+| Gate | Off / On | Automatable boolean — maps directly to MIDI in Ableton (see below) |
+| Decay | 50ms – 3s | Envelope decay time after gate closes |
 | Vac Speed | Slow / Med / Fast | Vactrol attack+decay coefficients |
 | Resonance | 0 – 100% | Feedback resonance; 0 = 292c character, higher = 292h |
 | Level | 0 – 100% | Output gain |
@@ -39,11 +40,11 @@ The vactrol emulation is what makes it sound right. The LDR resistance doesn't t
 ## Signal path
 
 ```
-[MIDI note-on / Strike button]
+[MIDI note-on / Gate param / Strike button]
          ↓
-[Envelope Generator]   fast attack (1ms) / exponential decay
+[Envelope Generator]   1ms attack / hold (sustain) / exponential decay
          ↓
-[Vactrol Model]        asymmetric IIR — attack << decay
+[Vactrol Model]        asymmetric IIR at audio rate — attack << decay
          ↓ R_normalized
          ├──────────────────────┐
 [1-pole LP filter]          [VCA gain]
@@ -52,7 +53,21 @@ The vactrol emulation is what makes it sound right. The LDR resistance doesn't t
               [Audio Out]
 ```
 
-The vactrol runs at control rate (~1kHz); the filter and VCA run per-sample.
+Gate signal flow: note-on / Gate → 1 opens the gate (attack → sustain); note-off / Gate → 0 starts the decay.
+
+---
+
+## Triggering the gate
+
+Three ways to open and close the gate — all work simultaneously:
+
+| Method | How |
+|--------|-----|
+| **MIDI notes** | Route a MIDI track to the audio track containing Lopas Gate via Ableton's **MIDI To** dropdown. Note-on opens, note-off closes. |
+| **Gate parameter** | In Ableton, press **Ctrl+M**, click the Gate button in the plugin, then press a key on your controller or step sequencer to map it. Hold = open, release = decay. This is the easiest path for step sequencers. |
+| **Strike button** | Hold the button in the plugin UI. Release starts decay. |
+
+**Recommended setup for a step sequencer driving an instrument:** put the instrument and Lopas Gate on the same audio track; put the step sequencer on its own MIDI track; MIDI-map the step sequencer's notes to the Gate parameter.
 
 ---
 
