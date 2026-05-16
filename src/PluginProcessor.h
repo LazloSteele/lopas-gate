@@ -37,7 +37,8 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    std::atomic<bool> strikeRequested { false };
+    std::atomic<bool> strikeRequested        { false };
+    std::atomic<bool> strikeReleaseRequested { false };
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

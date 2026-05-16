@@ -43,7 +43,15 @@ LopasGateEditor::LopasGateEditor(LopasGateProcessor& p)
 
     // Strike button
     addAndMakeVisible(strikeBtn);
-    strikeBtn.onClick = [this] { proc.strikeRequested.store(true); };
+    strikeBtn.onStateChange = [this, wasDown = false]() mutable
+    {
+        bool isDown = strikeBtn.isDown();
+        if (isDown && !wasDown)
+            proc.strikeRequested.store(true);
+        else if (!isDown && wasDown)
+            proc.strikeReleaseRequested.store(true);
+        wasDown = isDown;
+    };
 
     // Knobs
     auto setupKnob = [&](juce::Slider& knob, juce::Label& label, const juce::String& paramId)

@@ -84,9 +84,11 @@ void LopasGateProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     envelope.setDecaySeconds(decayParam->load());
     vactrol.setSpeed(static_cast<VactrolModel::Speed>((int)vacSpeedParam->load()));
 
-    // Consume strike request from UI
+    // Consume strike requests from UI
     if (strikeRequested.exchange(false))
         envelope.trigger();
+    if (strikeReleaseRequested.exchange(false))
+        envelope.release();
 
     // Build a lookup of MIDI events by sample position
     auto midiIt  = midiBuffer.begin();
@@ -107,6 +109,8 @@ void LopasGateProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
             auto msg = (*midiIt).getMessage();
             if (msg.isNoteOn())
                 envelope.trigger();
+            else if (msg.isNoteOff())
+                envelope.release();
             ++midiIt;
         }
 

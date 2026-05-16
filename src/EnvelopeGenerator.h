@@ -24,6 +24,12 @@ public:
         value             = 0.0f;
     }
 
+    void release()
+    {
+        if (phase == Phase::Attack || phase == Phase::Sustain)
+            phase = Phase::Decay;
+    }
+
     float process()
     {
         switch (phase)
@@ -36,9 +42,12 @@ public:
                 if (--attackSamplesLeft <= 0)
                 {
                     value = 1.0f;
-                    phase = Phase::Decay;
+                    phase = Phase::Sustain;
                 }
                 return value;
+
+            case Phase::Sustain:
+                return 1.0f;
 
             case Phase::Decay:
                 value *= decayCoeff;
@@ -61,7 +70,7 @@ public:
     }
 
 private:
-    enum class Phase { Idle, Attack, Decay };
+    enum class Phase { Idle, Attack, Sustain, Decay };
 
     double sampleRate        = 44100.0;
     Phase  phase             = Phase::Idle;
