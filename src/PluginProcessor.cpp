@@ -41,9 +41,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout LopasGateProcessor::createPa
         "level", "Level",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.8f));
 
-    layout.add(std::make_unique<juce::AudioParameterBool>(
-        "gate", "Gate", false));
-
     return layout;
 }
 
@@ -86,14 +83,6 @@ void LopasGateProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
     envelope.setDecaySeconds(decayParam->load());
     vactrol.setSpeed(static_cast<VactrolModel::Speed>((int)vacSpeedParam->load()));
-
-    // Gate parameter — automatable / MIDI-mappable in the host
-    bool gateOpen = apvts.getRawParameterValue("gate")->load() > 0.5f;
-    if (gateOpen && !lastGateParam)
-        envelope.trigger();
-    else if (!gateOpen && lastGateParam)
-        envelope.release();
-    lastGateParam = gateOpen;
 
     // Consume strike requests from UI
     if (strikeRequested.exchange(false))

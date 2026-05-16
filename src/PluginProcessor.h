@@ -52,7 +52,6 @@ private:
 
     float currentR             = 1.0f;
     float feedbackSample[kMaxChannels] = {};
-    bool  lastGateParam        = false;
 
     int ctrlRateCounter  = 0;
 
